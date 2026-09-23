@@ -1,3 +1,4 @@
+// REEMPLAZA ESTA URL CON TU URL REAL DE GOOGLE APPS SCRIPT
 const GAS_ENDPOINT = 'https://script.google.com/macros/s/TU_SCRIPT_ID_AQUI/exec';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -37,13 +38,14 @@ function setupEventListeners() {
     });
   });
 
-  // Lógica Formulario
+  // Lógica Formulario - Autocompletado de Ruta
   const placaSelect = document.getElementById('placa');
   placaSelect.addEventListener('change', async (e) => {
     const ruta = await DB.getRutaByPlaca(e.target.value);
     document.getElementById('ruta').value = ruta;
   });
 
+  // Lógica Formulario - Búsqueda por DNI
   const dniInput = document.getElementById('dni');
   dniInput.addEventListener('input', async (e) => {
     const dni = e.target.value.trim();
@@ -81,28 +83,32 @@ function setupEventListeners() {
     }
   });
 
-  // Lógica condicional: ¿Vas a regresar? -> Ocultar/Mostrar Retorno
+  // Lógica condicional: ¿Vas a regresar? -> Mostrar / Ocultar campo Retorno
   const vasARegresarSelect = document.getElementById('vasARegresar');
   const retornoGroup = document.getElementById('group-retorno');
   const retornoSelect = document.getElementById('tipoRetorno');
   const retornoFechaGroup = document.getElementById('group-fechaRetorno');
 
-  vasARegresarSelect.addEventListener('change', (e) => {
-    if (e.target.value === 'NO') {
+  function toggleRetornoVisibility() {
+    const valor = vasARegresarSelect.value;
+    if (valor === 'NO') {
       retornoGroup.style.display = 'none';
       retornoFechaGroup.style.display = 'none';
     } else {
       retornoGroup.style.display = 'block';
       retornoFechaGroup.style.display = retornoSelect.value === 'Específica' ? 'block' : 'none';
     }
-  });
+  }
 
-  // Lógica Retorno
+  vasARegresarSelect.addEventListener('change', toggleRetornoVisibility);
+
   retornoSelect.addEventListener('change', (e) => {
     if (vasARegresarSelect.value !== 'NO') {
       retornoFechaGroup.style.display = e.target.value === 'Específica' ? 'block' : 'none';
     }
   });
+
+  toggleRetornoVisibility();
 
   // Submit Formulario
   document.getElementById('ausentismo-form').addEventListener('submit', handleFormSubmit);
@@ -148,6 +154,8 @@ async function handleFormSubmit(e) {
   let fechaRetornoFinal = '';
   if (vasARegresar !== 'NO') {
     fechaRetornoFinal = tipoRetorno === 'Inmediato' ? 'Inmediato' : fechaRetornoVal;
+  } else {
+    fechaRetornoFinal = 'No aplica';
   }
 
   const record = {
@@ -170,6 +178,8 @@ async function handleFormSubmit(e) {
   alert('Registro guardado localmente exitosamente.');
   e.target.reset();
   await loadDropdowns();
+  
+  document.getElementById('vasARegresar').dispatchEvent(new Event('change'));
   await refreshRecordsList();
 
   if (navigator.onLine) triggerSync();
@@ -178,6 +188,10 @@ async function handleFormSubmit(e) {
 // Sync de Negocio (GAS Engine)
 async function triggerSync() {
   if (!navigator.onLine) return;
+  if (GAS_ENDPOINT.includes('TU_SCRIPT_ID_AQUI')) {
+    console.warn('Debes colocar tu ID de Google Apps Script en GAS_ENDPOINT');
+    return;
+  }
   
   const banner = document.getElementById('network-banner');
   banner.textContent = 'Sincronizando registros...';
@@ -189,8 +203,9 @@ async function triggerSync() {
     try {
       const response = await fetch(GAS_ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain' }, // Evita preflight CORS estricto en GAS
-        body: JSON.stringify({ action: 'SYNC_AUSENTISMOS', records: pending })
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'SYNC_AUSENTISMOS', records: pending }),
+        redirect: 'follow'
       });
       
       const res = await response.json();
@@ -198,9 +213,14 @@ async function triggerSync() {
         for (const item of pending) {
           await DB.updateRecordStatus(item.id, 'SINCRONIZADO');
         }
+      } else {
+        console.error('Error reportado por el servidor:', res);
       }
     } catch (err) {
-      console.error('Error al sincronizar:', err);
+      console.error('Error al sincronizar con Google Sheets:', err);
+      banner.textContent = 'Error al conectar con Google Sheets';
+      banner.className = 'offline';
+      return;
     }
   }
 
@@ -210,9 +230,9 @@ async function triggerSync() {
 }
 
 async function syncMasterData() {
-  if (!navigator.onLine) return;
+  if (!navigator.onLine || GAS_ENDPOINT.includes('TU_SCRIPT_ID_AQUI')) return;
   try {
-    const res = await fetch(`${GAS_ENDPOINT}?action=GET_MASTERS`);
+    const res = await fetch(`${GAS_ENDPOINT}?action=GET_MASTERS`, { redirect: 'follow' });
     const data = await res.json();
     if (data.maestros) await DB.setMaestros(data.maestros);
     if (data.personal) await DB.setPersonal(data.personal);
