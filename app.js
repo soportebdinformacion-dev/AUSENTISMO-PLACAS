@@ -1,4 +1,4 @@
-const GAS_ENDPOINT = 'https://script.google.com/macros/s/TU_SCRIPT_ID_AQUI/exec';
+const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzOZCP_cs0C3MWPfXq3M067cZOUts93nNkJmjxPsPSGLYQUKkwXMnyehKHwxcCDadOmbg/exec';
 
 document.addEventListener('DOMContentLoaded', () => {
   initApp();
