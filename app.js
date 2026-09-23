@@ -1,5 +1,5 @@
 // REEMPLAZA CON TU URL REAL DE GOOGLE APPS SCRIPT (Web App desplegada como "Cualquiera")
-const GAS_ENDPOINT = 'https://script.google.com/macros/s/TU_SCRIPT_ID_AQUI/exec';
+const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzmruzHnwsBTUQosKgAGLZbwX39cd1Q-jRBIF-66HK_EYvoZt1UUG8fLlJNOnQqUC5lAA/exec';
 
 document.addEventListener('DOMContentLoaded', () => {
   initApp();
