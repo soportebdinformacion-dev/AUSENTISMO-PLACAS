@@ -45,16 +45,13 @@ header {
   gap: 12px;
 }
 
-.logo-placeholder {
-  width: 36px;
+.header-logo {
   height: 36px;
+  width: auto;
+  object-fit: contain;
   background-color: white;
   border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--primary);
-  font-weight: bold;
+  padding: 2px;
 }
 
 #network-banner {
