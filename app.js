@@ -1,4 +1,4 @@
-const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzOZCP_cs0C3MWPfXq3M067cZOUts93nNkJmjxPsPSGLYQUKkwXMnyehKHwxcCDadOmbg/exec';
+const GAS_ENDPOINT = 'https://script.google.com/macros/s/TU_SCRIPT_ID_AQUI/exec';
 
 document.addEventListener('DOMContentLoaded', () => {
   initApp();
@@ -81,11 +81,27 @@ function setupEventListeners() {
     }
   });
 
-  // Lógica Retorno
+  // Lógica condicional: ¿Vas a regresar? -> Ocultar/Mostrar Retorno
+  const vasARegresarSelect = document.getElementById('vasARegresar');
+  const retornoGroup = document.getElementById('group-retorno');
   const retornoSelect = document.getElementById('tipoRetorno');
   const retornoFechaGroup = document.getElementById('group-fechaRetorno');
+
+  vasARegresarSelect.addEventListener('change', (e) => {
+    if (e.target.value === 'NO') {
+      retornoGroup.style.display = 'none';
+      retornoFechaGroup.style.display = 'none';
+    } else {
+      retornoGroup.style.display = 'block';
+      retornoFechaGroup.style.display = retornoSelect.value === 'Específica' ? 'block' : 'none';
+    }
+  });
+
+  // Lógica Retorno
   retornoSelect.addEventListener('change', (e) => {
-    retornoFechaGroup.style.display = e.target.value === 'Específica' ? 'block' : 'none';
+    if (vasARegresarSelect.value !== 'NO') {
+      retornoFechaGroup.style.display = e.target.value === 'Específica' ? 'block' : 'none';
+    }
   });
 
   // Submit Formulario
@@ -125,8 +141,14 @@ async function handleFormSubmit(e) {
   e.preventDefault();
 
   const id = 'REG-' + crypto.randomUUID();
+  const vasARegresar = document.getElementById('vasARegresar').value;
   const tipoRetorno = document.getElementById('tipoRetorno').value;
   const fechaRetornoVal = document.getElementById('fechaRetorno').value;
+
+  let fechaRetornoFinal = '';
+  if (vasARegresar !== 'NO') {
+    fechaRetornoFinal = tipoRetorno === 'Inmediato' ? 'Inmediato' : fechaRetornoVal;
+  }
 
   const record = {
     id: id,
@@ -138,8 +160,8 @@ async function handleFormSubmit(e) {
     fechaFalta: document.getElementById('fechaFalta').value,
     motivo: document.getElementById('motivo').value,
     observaciones: document.getElementById('observaciones').value,
-    vasARegresar: document.getElementById('vasARegresar').value,
-    fechaRetorno: tipoRetorno === 'Inmediato' ? 'Inmediato' : fechaRetornoVal,
+    vasARegresar: vasARegresar,
+    fechaRetorno: fechaRetornoFinal,
     estado: 'PENDIENTE',
     errorDetail: ''
   };
