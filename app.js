@@ -1,4 +1,4 @@
-// REEMPLAZA ESTA URL CON TU URL REAL DE GOOGLE APPS SCRIPT
+// REEMPLAZA CON TU URL REAL DE GOOGLE APPS SCRIPT (Web App desplegada como "Cualquiera")
 const GAS_ENDPOINT = 'https://script.google.com/macros/s/TU_SCRIPT_ID_AQUI/exec';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,9 +9,15 @@ document.addEventListener('DOMContentLoaded', () => {
 async function initApp() {
   registerServiceWorker();
   updateOnlineStatus();
+  
+  // 1. Cargar lo que esté guardado localmente en IndexedDB
   await loadDropdowns();
   await refreshRecordsList();
-  syncMasterData(); // Intento silencioso de actualizar maestros al iniciar
+  
+  // 2. Intentar actualizar con los datos más recientes de Google Sheets
+  if (navigator.onLine) {
+    await syncMasterData();
+  }
 }
 
 function registerServiceWorker() {
@@ -23,7 +29,10 @@ function registerServiceWorker() {
 
 // Interfaz y Navegación
 function setupEventListeners() {
-  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('online', () => {
+    updateOnlineStatus();
+    syncMasterData();
+  });
   window.addEventListener('offline', updateOnlineStatus);
 
   // Navegación Tabs
@@ -38,14 +47,19 @@ function setupEventListeners() {
     });
   });
 
-  // Lógica Formulario - Autocompletado de Ruta
+  // Autocompletado de Ruta según Placa elegida
   const placaSelect = document.getElementById('placa');
   placaSelect.addEventListener('change', async (e) => {
-    const ruta = await DB.getRutaByPlaca(e.target.value);
-    document.getElementById('ruta').value = ruta;
+    const val = e.target.value;
+    if (val) {
+      const ruta = await DB.getRutaByPlaca(val);
+      document.getElementById('ruta').value = ruta || '';
+    } else {
+      document.getElementById('ruta').value = '';
+    }
   });
 
-  // Lógica Formulario - Búsqueda por DNI
+  // Búsqueda en tiempo real por DNI
   const dniInput = document.getElementById('dni');
   dniInput.addEventListener('input', async (e) => {
     const dni = e.target.value.trim();
@@ -53,8 +67,9 @@ function setupEventListeners() {
     const nombreEl = document.getElementById('nombre');
 
     if (dni.length === 8) {
+      alertEl.textContent = 'Buscando...';
       const persona = await DB.getPersonalByDNI(dni);
-      if (persona) {
+      if (persona && persona.nombre) {
         nombreEl.value = persona.nombre;
         alertEl.textContent = '';
       } else {
@@ -78,12 +93,12 @@ function setupEventListeners() {
       obsGroup.style.display = 'block';
       obsInput.required = true;
     } else {
-      obsGroup.style.display = 'block'; // Permanece opcional
+      obsGroup.style.display = 'block';
       obsInput.required = false;
     }
   });
 
-  // Lógica condicional: ¿Vas a regresar? -> Mostrar / Ocultar campo Retorno
+  // Lógica condicional: ¿Vas a regresar? -> Ocultar/Mostrar Retorno
   const vasARegresarSelect = document.getElementById('vasARegresar');
   const retornoGroup = document.getElementById('group-retorno');
   const retornoSelect = document.getElementById('tipoRetorno');
@@ -110,39 +125,56 @@ function setupEventListeners() {
 
   toggleRetornoVisibility();
 
-  // Submit Formulario
+  // Envío del formulario
   document.getElementById('ausentismo-form').addEventListener('submit', handleFormSubmit);
 
-  // Botón Sincronización Manual
-  document.getElementById('btn-sync').addEventListener('click', triggerSync);
+  // Sincronización Manual
+  document.getElementById('btn-sync').addEventListener('click', async () => {
+    await syncMasterData();
+    await triggerSync();
+  });
 }
 
-// Sincronización Network Status
+// Estado de conexión
 function updateOnlineStatus() {
   const banner = document.getElementById('network-banner');
   if (navigator.onLine) {
     banner.textContent = 'En línea - Listo para sincronizar';
     banner.className = 'online';
-    triggerSync(); // Auto-sync al reconectar
   } else {
     banner.textContent = 'Modo Offline - Datos guardados localmente';
     banner.className = 'offline';
   }
 }
 
+// Cargar las opciones del Selector de Placas
 async function loadDropdowns() {
   const placas = await DB.getAllPlacas();
   const select = document.getElementById('placa');
-  select.innerHTML = '<option value="">Seleccione Placa...</option>';
-  placas.forEach(p => {
-    select.innerHTML += `<option value="${p}">${p}</option>`;
-  });
   
-  // Establecer fecha por defecto (Hoy)
-  document.getElementById('fechaFalta').valueToDate = new Date();
-  document.getElementById('fechaFalta').value = new Date().toISOString().split('T')[0];
+  const selectedValue = select.value;
+  select.innerHTML = '<option value="">Seleccione Placa...</option>';
+  
+  if (placas && placas.length > 0) {
+    placas.forEach(p => {
+      if (p) {
+        const option = document.createElement('option');
+        option.value = p;
+        option.textContent = p;
+        select.appendChild(option);
+      }
+    });
+    if (selectedValue) select.value = selectedValue;
+  }
+  
+  // Establecer fecha actual por defecto
+  const fechaFaltaInput = document.getElementById('fechaFalta');
+  if (!fechaFaltaInput.value) {
+    fechaFaltaInput.value = new Date().toISOString().split('T')[0];
+  }
 }
 
+// Guardar registro local
 async function handleFormSubmit(e) {
   e.preventDefault();
 
@@ -185,14 +217,11 @@ async function handleFormSubmit(e) {
   if (navigator.onLine) triggerSync();
 }
 
-// Sync de Negocio (GAS Engine)
+// Sincronizar registros pendientes hacia Google Sheets
 async function triggerSync() {
   if (!navigator.onLine) return;
-  if (GAS_ENDPOINT.includes('TU_SCRIPT_ID_AQUI')) {
-    console.warn('Debes colocar tu ID de Google Apps Script en GAS_ENDPOINT');
-    return;
-  }
-  
+  if (GAS_ENDPOINT.includes('TU_SCRIPT_ID_AQUI')) return;
+
   const banner = document.getElementById('network-banner');
   banner.textContent = 'Sincronizando registros...';
   banner.className = 'syncing';
@@ -204,8 +233,7 @@ async function triggerSync() {
       const response = await fetch(GAS_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'SYNC_AUSENTISMOS', records: pending }),
-        redirect: 'follow'
+        body: JSON.stringify({ action: 'SYNC_AUSENTISMOS', records: pending })
       });
       
       const res = await response.json();
@@ -213,14 +241,9 @@ async function triggerSync() {
         for (const item of pending) {
           await DB.updateRecordStatus(item.id, 'SINCRONIZADO');
         }
-      } else {
-        console.error('Error reportado por el servidor:', res);
       }
     } catch (err) {
-      console.error('Error al sincronizar con Google Sheets:', err);
-      banner.textContent = 'Error al conectar con Google Sheets';
-      banner.className = 'offline';
-      return;
+      console.error('Error al sincronizar pendientes:', err);
     }
   }
 
@@ -229,25 +252,35 @@ async function triggerSync() {
   await refreshRecordsList();
 }
 
+// Obtener Tablas Maestras (Placas y Personal) desde Google Sheets
 async function syncMasterData() {
   if (!navigator.onLine || GAS_ENDPOINT.includes('TU_SCRIPT_ID_AQUI')) return;
+  
   try {
-    const res = await fetch(`${GAS_ENDPOINT}?action=GET_MASTERS`, { redirect: 'follow' });
+    const res = await fetch(`${GAS_ENDPOINT}?action=GET_MASTERS`);
     const data = await res.json();
-    if (data.maestros) await DB.setMaestros(data.maestros);
-    if (data.personal) await DB.setPersonal(data.personal);
+    
+    if (data.maestros && Array.isArray(data.maestros)) {
+      await DB.setMaestros(data.maestros);
+    }
+    if (data.personal && Array.isArray(data.personal)) {
+      await DB.setPersonal(data.personal);
+    }
+    
+    // Recargar el desplegable de placas una vez sincronizado
     await loadDropdowns();
   } catch (err) {
-    console.warn('Error obteniendo maestros actualizados:', err);
+    console.warn('Error al obtener datos maestros de Google Sheets:', err);
   }
 }
 
+// Actualizar lista en pantalla
 async function refreshRecordsList() {
   const records = await DB.getAllRecords();
   const container = document.getElementById('records-list');
   container.innerHTML = '';
 
-  if(records.length === 0) {
+  if (records.length === 0) {
     container.innerHTML = '<p style="text-align:center; color: #757575;">No hay registros locales.</p>';
     return;
   }
