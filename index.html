@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agrícola Huarmey - Ausentismo</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2E7D32">
+  <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
+</head>
+<body>
+
+  <header>
+    <div class="brand-container">
+      <div class="logo-placeholder">AH</div>
+      <h2>Agrícola Huarmey</h2>
+    </div>
+  </header>
+
+  <div id="network-banner" class="online">Comprobando red...</div>
+
+  <main>
+    <!-- VISTA 1: NUEVO REGISTRO -->
+    <section id="view-nuevo" class="view active">
+      <div class="card">
+        <form id="ausentismo-form">
+          <div class="form-group">
+            <label for="placa">Placa *</label>
+            <select id="placa" required></select>
+          </div>
+
+          <div class="form-group">
+            <label for="ruta">Ruta</label>
+            <input type="text" id="ruta" readonly placeholder="Se autocompleta con la placa">
+          </div>
+
+          <div class="form-group">
+            <label for="dni">DNI Personal *</label>
+            <input type="text" id="dni" maxlength="8" pattern="[0-9]{8}" inputmode="numeric" placeholder="8 dígitos" required>
+            <div id="dni-alert" class="alert-inline"></div>
+          </div>
+
+          <div class="form-group">
+            <label for="nombre">Apellidos y Nombres</label>
+            <input type="text" id="nombre" readonly placeholder="Búsqueda por DNI">
+          </div>
+
+          <div class="form-group">
+            <label for="fechaFalta">Fecha de Falta *</label>
+            <input type="date" id="fechaFalta" required>
+          </div>
+
+          <div class="form-group">
+            <label for="motivo">Motivo de Ausencia *</label>
+            <select id="motivo" required>
+              <option value="">Seleccione...</option>
+              <option value="Ninguno">Ninguno</option>
+              <option value="Descanso médico (Absentismo)">Descanso médico (Absentismo)</option>
+              <option value="Permiso con papeleta (Absentismo)">Permiso con papeleta (Absentismo)</option>
+              <option value="Enfermedad">Enfermedad</option>
+              <option value="Problemas familiares">Problemas familiares</option>
+              <option value="Transporte">Transporte</option>
+              <option value="Otro trabajo">Otro trabajo</option>
+              <option value="Desmotivación">Desmotivación</option>
+              <option value="Sacar tarjeta">Sacar tarjeta</option>
+              <option value="Pago">Pago</option>
+              <option value="Horario">Horario</option>
+              <option value="Alimentación">Alimentación</option>
+              <option value="Campamento">Campamento</option>
+              <option value="Ambiente laboral">Ambiente laboral</option>
+              <option value="Renuncia">Renuncia</option>
+              <option value="Problemas con el caporal">Problemas con el caporal</option>
+              <option value="Estudios">Estudios</option>
+              <option value="Viaje">Viaje</option>
+              <option value="Accidente">Accidente</option>
+              <option value="No desea continuar">No desea continuar</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="group-observaciones">
+            <label for="observaciones">Observaciones</label>
+            <textarea id="observaciones" rows="3" placeholder="Detalle observaciones adicionales..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="vasARegresar">¿Vas a regresar? *</label>
+            <select id="vasARegresar" required>
+              <option value="SI">SI</option>
+              <option value="NO">NO</option>
+              <option value="Lo está pensando">Lo está pensando</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="tipoRetorno">Retorno</label>
+            <select id="tipoRetorno">
+              <option value="Inmediato">Inmediato</option>
+              <option value="Específica">Fecha Específica</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="group-fechaRetorno" style="display:none;">
+            <label for="fechaRetorno">Fecha de Retorno</label>
+            <input type="date" id="fechaRetorno">
+          </div>
+
+          <button type="submit" class="btn btn-primary">Guardar Registro</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- VISTA 2: LISTA DE REGISTROS -->
+    <section id="view-registros" class="view">
+      <div class="card">
+        <h3>Histórico / Pendientes</h3>
+        <br>
+        <div id="records-list"></div>
+      </div>
+    </section>
+
+    <!-- VISTA 3: CONFIG / SYNC -->
+    <section id="view-config" class="view">
+      <div class="card">
+        <h3>Sincronización</h3>
+        <p style="margin: 12px 0; color: var(--text-secondary);">Forzar sincronización manual de la cola de registros con la hoja central de Google Sheets.</p>
+        <button id="btn-sync" class="btn btn-primary">Sincronizar Ahora</button>
+      </div>
+    </section>
+  </main>
+
+  <nav>
+    <button class="nav-btn active" data-view="view-nuevo">📝 Registro</button>
+    <button class="nav-btn" data-view="view-registros">📁 Guardados</button>
+    <button class="nav-btn" data-view="view-config">🔄 Sincronizar</button>
+  </nav>
+
+  <script src="db.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
