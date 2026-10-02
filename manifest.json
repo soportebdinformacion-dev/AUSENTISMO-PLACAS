@@ -2,20 +2,12 @@
   "short_name": "HuarmeyApp",
   "name": "Agrícola Huarmey - Registro de Ausentismo",
   "icons": [
-    {
-      "src": "https://via.placeholder.com/192x192/2E7D32/FFFFFF?text=Huarmey",
-      "type": "image/png",
-      "sizes": "192x192"
-    },
-    {
-      "src": "https://via.placeholder.com/512x512/2E7D32/FFFFFF?text=Huarmey",
-      "type": "image/png",
-      "sizes": "512x512"
-    }
+    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
   ],
   "start_url": "./index.html",
-  "background_color": "#F5F5F5",
-  "theme_color": "#2E7D32",
+  "background_color": "#FFFFFF",
+  "theme_color": "#1F5C3A",
   "display": "standalone",
   "orientation": "portrait"
 }
