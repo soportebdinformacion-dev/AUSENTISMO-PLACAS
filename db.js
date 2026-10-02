@@ -1,6 +1,4 @@
-// Inicialización del almacén IndexedDB usando Dexie.js
 const db = new Dexie('HuarmeyDB');
-
 db.version(1).stores({
   maestros: 'placa',
   personal: 'dni',
@@ -8,45 +6,33 @@ db.version(1).stores({
 });
 
 const DB = {
-  // Configuración inicial de datos remotos a caché local
   async setMaestros(data) {
-    await db.maestros.clear();
-    await db.maestros.bulkPut(data);
+    const rows = (data || []).filter(r => r.placa);
+    if (!rows.length) return; // nunca vaciar el caché local con datos vacíos
+    await db.transaction('rw', db.maestros, async () => { await db.maestros.clear(); await db.maestros.bulkPut(rows); });
   },
-
-  async getRutaByPlaca(placa) {
-    const record = await db.maestros.get(placa);
-    return record ? record.ruta : '';
-  },
-
-  async getAllPlacas() {
-    const list = await db.maestros.toArray();
-    return list.map(item => item.placa);
-  },
-
   async setPersonal(data) {
-    await db.personal.clear();
-    await db.personal.bulkPut(data);
+    const rows = (data || []).filter(r => r.dni);
+    if (!rows.length) return;
+    await db.transaction('rw', db.personal, async () => { await db.personal.clear(); await db.personal.bulkPut(rows); });
   },
+  async getRutaByPlaca(placa) { const r = await db.maestros.get(placa); return r ? r.ruta : ''; },
+  async getAllPlacas() { return (await db.maestros.orderBy('placa').keys()); },
+  async getPersonalByDNI(dni) { return db.personal.get(dni); },
+  async countPersonal() { return db.personal.count(); },
 
-  async getPersonalByDNI(dni) {
-    return await db.personal.get(dni);
+  async saveAusentismo(record) { return db.ausentismos.put(record); },
+  async getPendingRecords() { return db.ausentismos.where('estado').equals('PENDIENTE').toArray(); },
+  async getAllRecords() { return db.ausentismos.orderBy('fechaRegistro').reverse().limit(300).toArray(); },
+  async updateRecordStatus(id, estado, errorDetail = '') { await db.ausentismos.update(id, { estado, errorDetail }); },
+  async markSynced(ids) {
+    await db.transaction('rw', db.ausentismos, async () => {
+      for (const id of ids) await db.ausentismos.update(id, { estado: 'SINCRONIZADO', errorDetail: '' });
+    });
   },
-
-  // Gestión de Ausentismos
-  async saveAusentismo(record) {
-    return await db.ausentismos.put(record);
-  },
-
-  async getPendingRecords() {
-    return await db.ausentismos.where('estado').equals('PENDIENTE').toArray();
-  },
-
-  async getAllRecords() {
-    return await db.ausentismos.orderBy('fechaRegistro').reverse().toArray();
-  },
-
-  async updateRecordStatus(id, estado, errorDetail = '') {
-    await db.ausentismos.update(id, { estado, errorDetail });
+  async retryErrors() { await db.ausentismos.where('estado').equals('ERROR').modify({ estado: 'PENDIENTE' }); },
+  async counts() {
+    const [p, e, s] = await Promise.all(['PENDIENTE', 'ERROR', 'SINCRONIZADO'].map(x => db.ausentismos.where('estado').equals(x).count()));
+    return { pendientes: p, errores: e, sincronizados: s };
   }
 };
