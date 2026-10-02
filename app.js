@@ -1,302 +1,200 @@
-// REEMPLAZA CON TU URL REAL DE GOOGLE APPS SCRIPT (Web App desplegada como "Cualquiera")
-const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzmruzHnwsBTUQosKgAGLZbwX39cd1Q-jRBIF-66HK_EYvoZt1UUG8fLlJNOnQqUC5lAA/exec';
+const GAS_ENDPOINT = 'https://script.google.com/macros/s/TU_SCRIPT_ID_AQUI/exec';
+const BATCH_SIZE = 25;          // registros por envío
+const SYNC_EVERY_MS = 60000;    // revisión periódica (solo envía si hay pendientes)
+const MOTIVOS_CON_DETALLE = ['Transporte', 'Otro trabajo', 'Renuncia', 'Problemas con el caporal', 'No desea continuar'];
 
-document.addEventListener('DOMContentLoaded', () => {
-  initApp();
-  setupEventListeners();
-});
+const $ = id => document.getElementById(id);
+const rand = (min, max) => min + Math.random() * (max - min);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+
+let syncing = false, syncTimer = null;
+
+document.addEventListener('DOMContentLoaded', initApp);
 
 async function initApp() {
-  registerServiceWorker();
-  updateOnlineStatus();
-  
-  // 1. Cargar lo que esté guardado localmente en IndexedDB
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(console.error);
+  setupEvents();
+  setStatus(navigator.onLine ? 'online' : 'offline');
   await loadDropdowns();
-  await refreshRecordsList();
-  
-  // 2. Intentar actualizar con los datos más recientes de Google Sheets
-  if (navigator.onLine) {
-    await syncMasterData();
-  }
+  await refreshAll();
+  // Escalonar para que 160 equipos no pidan todos a la vez
+  const firstRun = (await DB.countPersonal()) === 0;
+  setTimeout(syncMasterData, firstRun ? 0 : rand(0, 10000));
+  queueSync(rand(2000, 10000));
+  setInterval(() => queueSync(rand(0, 8000)), SYNC_EVERY_MS);
 }
 
-function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js')
-      .catch(err => console.error('Error al registrar SW:', err));
-  }
+function setStatus(kind, text) {
+  const labels = { online: 'En línea', offline: 'Sin conexión', syncing: 'Sincronizando…' };
+  $('status').className = 'pill ' + kind;
+  $('status-text').textContent = text || labels[kind];
 }
 
-// Interfaz y Navegación
-function setupEventListeners() {
-  window.addEventListener('online', () => {
-    updateOnlineStatus();
-    syncMasterData();
-  });
-  window.addEventListener('offline', updateOnlineStatus);
-
-  // Navegación Tabs
-  document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      
-      const target = e.currentTarget;
-      target.classList.add('active');
-      document.getElementById(target.dataset.view).classList.add('active');
-    });
-  });
-
-  // Autocompletado de Ruta según Placa elegida
-  const placaSelect = document.getElementById('placa');
-  placaSelect.addEventListener('change', async (e) => {
-    const val = e.target.value;
-    if (val) {
-      const ruta = await DB.getRutaByPlaca(val);
-      document.getElementById('ruta').value = ruta || '';
-    } else {
-      document.getElementById('ruta').value = '';
-    }
-  });
-
-  // Búsqueda en tiempo real por DNI
-  const dniInput = document.getElementById('dni');
-  dniInput.addEventListener('input', async (e) => {
-    const dni = e.target.value.trim();
-    const alertEl = document.getElementById('dni-alert');
-    const nombreEl = document.getElementById('nombre');
-
-    if (dni.length === 8) {
-      alertEl.textContent = 'Buscando...';
-      const persona = await DB.getPersonalByDNI(dni);
-      if (persona && persona.nombre) {
-        nombreEl.value = persona.nombre;
-        alertEl.textContent = '';
-      } else {
-        nombreEl.value = '';
-        alertEl.textContent = 'DNI no encontrado en el padrón local.';
-      }
-    } else {
-      nombreEl.value = '';
-      alertEl.textContent = '';
-    }
-  });
-
-  // Lógica condicional: Motivo -> Observaciones
-  const motivoSelect = document.getElementById('motivo');
-  const obsGroup = document.getElementById('group-observaciones');
-  const obsInput = document.getElementById('observaciones');
-  const motivosObligatorios = ['Transporte', 'Otro trabajo', 'Renuncia', 'Problemas con el caporal', 'No desea continuar'];
-
-  motivoSelect.addEventListener('change', (e) => {
-    if (motivosObligatorios.includes(e.target.value)) {
-      obsGroup.style.display = 'block';
-      obsInput.required = true;
-    } else {
-      obsGroup.style.display = 'block';
-      obsInput.required = false;
-    }
-  });
-
-  // Lógica condicional: ¿Vas a regresar? -> Ocultar/Mostrar Retorno
-  const vasARegresarSelect = document.getElementById('vasARegresar');
-  const retornoGroup = document.getElementById('group-retorno');
-  const retornoSelect = document.getElementById('tipoRetorno');
-  const retornoFechaGroup = document.getElementById('group-fechaRetorno');
-
-  function toggleRetornoVisibility() {
-    const valor = vasARegresarSelect.value;
-    if (valor === 'NO') {
-      retornoGroup.style.display = 'none';
-      retornoFechaGroup.style.display = 'none';
-    } else {
-      retornoGroup.style.display = 'block';
-      retornoFechaGroup.style.display = retornoSelect.value === 'Específica' ? 'block' : 'none';
-    }
-  }
-
-  vasARegresarSelect.addEventListener('change', toggleRetornoVisibility);
-
-  retornoSelect.addEventListener('change', (e) => {
-    if (vasARegresarSelect.value !== 'NO') {
-      retornoFechaGroup.style.display = e.target.value === 'Específica' ? 'block' : 'none';
-    }
-  });
-
-  toggleRetornoVisibility();
-
-  // Envío del formulario
-  document.getElementById('ausentismo-form').addEventListener('submit', handleFormSubmit);
-
-  // Sincronización Manual
-  document.getElementById('btn-sync').addEventListener('click', async () => {
-    await syncMasterData();
-    await triggerSync();
-  });
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600);
 }
 
-// Estado de conexión
-function updateOnlineStatus() {
-  const banner = document.getElementById('network-banner');
-  if (navigator.onLine) {
-    banner.textContent = 'En línea - Listo para sincronizar';
-    banner.className = 'online';
-  } else {
-    banner.textContent = 'Modo Offline - Datos guardados localmente';
-    banner.className = 'offline';
-  }
+function setupEvents() {
+  window.addEventListener('online', () => { setStatus('online'); queueSync(rand(1000, 12000)); });
+  window.addEventListener('offline', () => setStatus('offline'));
+
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-btn, .view').forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+    $(btn.dataset.view).classList.add('active');
+    window.scrollTo(0, 0);
+  }));
+
+  $('placa').addEventListener('change', async e => { $('ruta').value = await DB.getRutaByPlaca(e.target.value); });
+
+  $('dni').addEventListener('input', async e => {
+    const dni = e.target.value = e.target.value.replace(/\D/g, '');
+    const hint = $('dni-alert');
+    $('nombre').value = ''; hint.textContent = ''; hint.className = 'hint';
+    if (dni.length !== 8) return;
+    const p = await DB.getPersonalByDNI(dni);
+    if (p) { $('nombre').value = p.nombre; hint.textContent = 'Trabajador encontrado'; hint.className = 'hint good'; }
+    else { hint.textContent = 'DNI no encontrado en el padrón local'; hint.className = 'hint bad'; }
+  });
+
+  $('motivo').addEventListener('change', e => {
+    const req = MOTIVOS_CON_DETALLE.includes(e.target.value);
+    $('observaciones').required = req;
+    $('obs-req').textContent = req ? '(obligatorio para este motivo)' : '(opcional)';
+    $('obs-req').className = req ? 'req' : '';
+  });
+
+  document.querySelectorAll('input[name=tipoRetorno]').forEach(r => r.addEventListener('change', () => {
+    $('group-fechaRetorno').hidden = getRadio('tipoRetorno') !== 'Específica';
+  }));
+
+  $('ausentismo-form').addEventListener('submit', handleFormSubmit);
+  $('btn-sync').addEventListener('click', () => { if (!navigator.onLine) return toast('Sin conexión'); triggerSync(); });
+  $('btn-retry').addEventListener('click', async () => { await DB.retryErrors(); await refreshAll(); queueSync(0); });
 }
 
-// Cargar las opciones del Selector de Placas
+const getRadio = name => document.querySelector(`input[name=${name}]:checked`).value;
+
 async function loadDropdowns() {
   const placas = await DB.getAllPlacas();
-  const select = document.getElementById('placa');
-  
-  const selectedValue = select.value;
-  select.innerHTML = '<option value="">Seleccione Placa...</option>';
-  
-  if (placas && placas.length > 0) {
-    placas.forEach(p => {
-      if (p) {
-        const option = document.createElement('option');
-        option.value = p;
-        option.textContent = p;
-        select.appendChild(option);
-      }
-    });
-    if (selectedValue) select.value = selectedValue;
-  }
-  
-  // Establecer fecha actual por defecto
-  const fechaFaltaInput = document.getElementById('fechaFalta');
-  if (!fechaFaltaInput.value) {
-    fechaFaltaInput.value = new Date().toISOString().split('T')[0];
-  }
+  const sel = $('placa'), cur = sel.value;
+  sel.innerHTML = '<option value="">Seleccione placa…</option>' + placas.map(p => `<option>${esc(p)}</option>`).join('');
+  sel.value = cur;
+  if (!$('fechaFalta').value) $('fechaFalta').value = today();
 }
 
-// Guardar registro local
+function validate() {
+  const bad = [];
+  const check = (id, ok) => { $(id).classList.toggle('invalid', !ok); if (!ok) bad.push(id); };
+  check('placa', !!$('placa').value);
+  check('dni', /^\d{8}$/.test($('dni').value));
+  check('fechaFalta', !!$('fechaFalta').value);
+  check('motivo', !!$('motivo').value);
+  check('observaciones', !$('observaciones').required || !!$('observaciones').value.trim());
+  if (getRadio('tipoRetorno') === 'Específica') check('fechaRetorno', !!$('fechaRetorno').value && $('fechaRetorno').value >= $('fechaFalta').value);
+  if (bad.length) { $(bad[0]).focus(); toast('Revise los campos marcados'); }
+  return !bad.length;
+}
+
 async function handleFormSubmit(e) {
   e.preventDefault();
-
-  const id = 'REG-' + crypto.randomUUID();
-  const vasARegresar = document.getElementById('vasARegresar').value;
-  const tipoRetorno = document.getElementById('tipoRetorno').value;
-  const fechaRetornoVal = document.getElementById('fechaRetorno').value;
-
-  let fechaRetornoFinal = '';
-  if (vasARegresar !== 'NO') {
-    fechaRetornoFinal = tipoRetorno === 'Inmediato' ? 'Inmediato' : fechaRetornoVal;
-  } else {
-    fechaRetornoFinal = 'No aplica';
-  }
-
+  if (!validate()) return;
+  const btn = $('btn-save'); btn.disabled = true;
   const record = {
-    id: id,
+    id: 'REG-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2)),
     fechaRegistro: new Date().toISOString(),
-    placa: document.getElementById('placa').value,
-    ruta: document.getElementById('ruta').value,
-    dni: document.getElementById('dni').value,
-    nombre: document.getElementById('nombre').value,
-    fechaFalta: document.getElementById('fechaFalta').value,
-    motivo: document.getElementById('motivo').value,
-    observaciones: document.getElementById('observaciones').value,
-    vasARegresar: vasARegresar,
-    fechaRetorno: fechaRetornoFinal,
-    estado: 'PENDIENTE',
-    errorDetail: ''
+    placa: $('placa').value, ruta: $('ruta').value, dni: $('dni').value, nombre: $('nombre').value,
+    fechaFalta: $('fechaFalta').value, motivo: $('motivo').value, observaciones: $('observaciones').value.trim(),
+    vasARegresar: getRadio('vasARegresar'),
+    fechaRetorno: getRadio('tipoRetorno') === 'Inmediato' ? 'Inmediato' : $('fechaRetorno').value,
+    estado: 'PENDIENTE', errorDetail: ''
   };
-
   await DB.saveAusentismo(record);
-  alert('Registro guardado localmente exitosamente.');
   e.target.reset();
+  $('nombre').value = ''; $('ruta').value = ''; $('dni-alert').textContent = ''; $('group-fechaRetorno').hidden = true;
+  $('obs-req').textContent = ''; $('observaciones').required = false;
   await loadDropdowns();
-  
-  document.getElementById('vasARegresar').dispatchEvent(new Event('change'));
-  await refreshRecordsList();
-
-  if (navigator.onLine) triggerSync();
+  await refreshAll();
+  btn.disabled = false;
+  toast(navigator.onLine ? 'Guardado. Se enviará en breve' : 'Guardado sin conexión');
+  queueSync(rand(3000, 9000));
 }
 
-// Sincronizar registros pendientes hacia Google Sheets
-async function triggerSync() {
-  if (!navigator.onLine) return;
-  if (GAS_ENDPOINT.includes('TU_SCRIPT_ID_AQUI')) return;
+// ===== Sincronización escalonada: cola, lotes, reintentos con espera =====
+function queueSync(delay = 0) {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => triggerSync(), delay);
+}
 
-  const banner = document.getElementById('network-banner');
-  banner.textContent = 'Sincronizando registros...';
-  banner.className = 'syncing';
-
-  const pending = await DB.getPendingRecords();
-
-  if (pending.length > 0) {
+async function postBatch(batch) {
+  for (let attempt = 0; attempt < 4; attempt++) {
     try {
-      const response = await fetch(GAS_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'SYNC_AUSENTISMOS', records: pending })
+      const res = await fetch(GAS_ENDPOINT, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'SYNC_AUSENTISMOS', records: batch })
       });
-      
-      const res = await response.json();
-      if (res.status === 'SUCCESS') {
-        for (const item of pending) {
-          await DB.updateRecordStatus(item.id, 'SINCRONIZADO');
-        }
-      }
-    } catch (err) {
-      console.error('Error al sincronizar pendientes:', err);
-    }
+      const data = await res.json();
+      if (data.status === 'SUCCESS') return data;
+    } catch (err) { console.warn('Intento fallido', err); }
+    await sleep(Math.min(30000, 1500 * 2 ** attempt) + rand(0, 1500)); // espera exponencial + azar
   }
-
-  banner.textContent = 'En línea - Sincronizado';
-  banner.className = 'online';
-  await refreshRecordsList();
+  throw new Error('Servidor ocupado');
 }
 
-// Obtener Tablas Maestras (Placas y Personal) desde Google Sheets
-async function syncMasterData() {
-  if (!navigator.onLine || GAS_ENDPOINT.includes('TU_SCRIPT_ID_AQUI')) return;
-  
+async function triggerSync() {
+  if (!navigator.onLine || syncing) return;
+  let pending = await DB.getPendingRecords();
+  if (!pending.length) return await refreshAll();
+  syncing = true; setStatus('syncing');
   try {
-    const res = await fetch(`${GAS_ENDPOINT}?action=GET_MASTERS`);
-    const data = await res.json();
-    
-    if (data.maestros && Array.isArray(data.maestros)) {
-      await DB.setMaestros(data.maestros);
+    while (pending.length) {
+      const res = await postBatch(pending.slice(0, BATCH_SIZE));
+      await DB.markSynced([...res.saved, ...res.duplicates]);
+      for (const r of res.rejected) await DB.updateRecordStatus(r.id, 'ERROR', r.reason);
+      if (!res.saved.length && !res.duplicates.length && !res.rejected.length) throw new Error('Sin progreso');
+      pending = await DB.getPendingRecords();
     }
-    if (data.personal && Array.isArray(data.personal)) {
-      await DB.setPersonal(data.personal);
-    }
-    
-    // Recargar el desplegable de placas una vez sincronizado
-    await loadDropdowns();
+    localStorage.setItem('lastSync', Date.now());
+    setStatus('online');
   } catch (err) {
-    console.warn('Error al obtener datos maestros de Google Sheets:', err);
+    setStatus('online', 'Reintentando envío…');
+    queueSync(rand(20000, 60000));
+  } finally {
+    syncing = false;
+    await refreshAll();
   }
 }
 
-// Actualizar lista en pantalla
-async function refreshRecordsList() {
-  const records = await DB.getAllRecords();
-  const container = document.getElementById('records-list');
-  container.innerHTML = '';
+async function syncMasterData() {
+  if (!navigator.onLine) return;
+  try {
+    const v = localStorage.getItem('mastersVersion') || '';
+    const res = await fetch(`${GAS_ENDPOINT}?action=GET_MASTERS&v=${encodeURIComponent(v)}`);
+    const data = await res.json();
+    if (data.status !== 'OK' || data.unchanged) return;
+    await DB.setMaestros(data.maestros);
+    await DB.setPersonal(data.personal);
+    localStorage.setItem('mastersVersion', data.version);
+    await loadDropdowns();
+  } catch (err) { console.warn('No se pudieron actualizar los maestros:', err); }
+}
 
-  if (records.length === 0) {
-    container.innerHTML = '<p style="text-align:center; color: #757575;">No hay registros locales.</p>';
-    return;
-  }
+// ===== Pantallas =====
+async function refreshAll() {
+  const [records, c] = await Promise.all([DB.getAllRecords(), DB.counts()]);
+  $('n-pend').textContent = c.pendientes; $('n-err').textContent = c.errores; $('n-ok').textContent = c.sincronizados;
+  $('btn-retry').hidden = !c.errores;
+  const badge = $('nav-badge'); badge.hidden = !c.pendientes; badge.textContent = c.pendientes;
+  const ls = localStorage.getItem('lastSync');
+  $('last-sync').textContent = ls ? 'Último envío: ' + new Date(+ls).toLocaleString('es-PE') : 'Aún no se ha enviado nada';
 
-  records.forEach(r => {
-    container.innerHTML += `
-      <div class="record-item">
-        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-          <strong>${r.nombre || 'DNI: ' + r.dni}</strong>
-          <span class="badge ${r.estado}">${r.estado}</span>
-        </div>
-        <div style="font-size:0.85rem; color: var(--text-secondary);">
-          Placa: ${r.placa} | Motivo: ${r.motivo}<br>
-          Falta: ${r.fechaFalta}
-        </div>
-      </div>
-    `;
-  });
+  $('records-list').innerHTML = records.length ? records.map(r => `
+    <article class="record ${esc(r.estado)}">
+      <header><span>${esc(r.nombre || 'DNI ' + r.dni)}</span><span class="chip ${esc(r.estado)}">${esc(r.estado)}</span></header>
+      <p>Placa ${esc(r.placa)} · ${esc(r.motivo)}<br>Falta: ${esc(r.fechaFalta)}</p>
+      ${r.errorDetail ? `<p class="err">${esc(r.errorDetail)}</p>` : ''}
+    </article>`).join('') : '<p class="empty">Aún no hay registros. Los que guarde aparecerán aquí.</p>';
 }
