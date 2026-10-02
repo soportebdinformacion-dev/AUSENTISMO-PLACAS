@@ -1,4 +1,4 @@
-const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzM8gHHnQV7UYn0CQH1daeNXnd2CqQ6pdtFQJMLsGDwLIuQkiD5Lvo-Xas3A41C1tEvcA/exec';
+const GAS_ENDPOINT = 'https://script.google.com/macros/s/TU_SCRIPT_ID_AQUI/exec';
 const BATCH_SIZE = 25;          // registros por envío
 const SYNC_EVERY_MS = 60000;    // revisión periódica (solo envía si hay pendientes)
 const MOTIVOS_CON_DETALLE = ['Transporte', 'Otro trabajo', 'Renuncia', 'Problemas con el caporal', 'No desea continuar'];
@@ -67,9 +67,13 @@ function setupEvents() {
     $('obs-req').className = req ? 'req' : '';
   });
 
-  document.querySelectorAll('input[name=tipoRetorno]').forEach(r => r.addEventListener('change', () => {
-    $('group-fechaRetorno').hidden = getRadio('tipoRetorno') !== 'Específica';
-  }));
+  const toggleRetorno = () => {
+    const si = getRadio('vasARegresar') === 'SI';
+    $('group-retorno').hidden = !si;                       // NO / Lo piensa: no se muestra nada
+    $('group-fechaRetorno').hidden = !si || getRadio('tipoRetorno') !== 'Específica';
+    if (!si) $('fechaRetorno').classList.remove('invalid');
+  };
+  document.querySelectorAll('input[name=vasARegresar], input[name=tipoRetorno]').forEach(r => r.addEventListener('change', toggleRetorno));
 
   $('ausentismo-form').addEventListener('submit', handleFormSubmit);
   $('btn-sync').addEventListener('click', () => { if (!navigator.onLine) return toast('Sin conexión'); triggerSync(); });
@@ -94,7 +98,7 @@ function validate() {
   check('fechaFalta', !!$('fechaFalta').value);
   check('motivo', !!$('motivo').value);
   check('observaciones', !$('observaciones').required || !!$('observaciones').value.trim());
-  if (getRadio('tipoRetorno') === 'Específica') check('fechaRetorno', !!$('fechaRetorno').value && $('fechaRetorno').value >= $('fechaFalta').value);
+  if (getRadio('vasARegresar') === 'SI' && getRadio('tipoRetorno') === 'Específica') check('fechaRetorno', !!$('fechaRetorno').value && $('fechaRetorno').value >= $('fechaFalta').value);
   if (bad.length) { $(bad[0]).focus(); toast('Revise los campos marcados'); }
   return !bad.length;
 }
@@ -109,12 +113,12 @@ async function handleFormSubmit(e) {
     placa: $('placa').value, ruta: $('ruta').value, dni: $('dni').value, nombre: $('nombre').value,
     fechaFalta: $('fechaFalta').value, motivo: $('motivo').value, observaciones: $('observaciones').value.trim(),
     vasARegresar: getRadio('vasARegresar'),
-    fechaRetorno: getRadio('tipoRetorno') === 'Inmediato' ? 'Inmediato' : $('fechaRetorno').value,
+    fechaRetorno: getRadio('vasARegresar') !== 'SI' ? '' : (getRadio('tipoRetorno') === 'Inmediato' ? 'Inmediato' : $('fechaRetorno').value),
     estado: 'PENDIENTE', errorDetail: ''
   };
   await DB.saveAusentismo(record);
   e.target.reset();
-  $('nombre').value = ''; $('ruta').value = ''; $('dni-alert').textContent = ''; $('group-fechaRetorno').hidden = true;
+  $('nombre').value = ''; $('ruta').value = ''; $('dni-alert').textContent = ''; $('group-retorno').hidden = false; $('group-fechaRetorno').hidden = true;
   $('obs-req').textContent = ''; $('observaciones').required = false;
   await loadDropdowns();
   await refreshAll();
@@ -171,13 +175,13 @@ async function triggerSync() {
 async function syncMasterData() {
   if (!navigator.onLine) return;
   try {
-    const v = localStorage.getItem('mastersVersion') || '';
+    const v = localStorage.getItem('mastersVersion2') || '';
     const res = await fetch(`${GAS_ENDPOINT}?action=GET_MASTERS&v=${encodeURIComponent(v)}`);
     const data = await res.json();
     if (data.status !== 'OK' || data.unchanged) return;
     await DB.setMaestros(data.maestros);
     await DB.setPersonal(data.personal);
-    localStorage.setItem('mastersVersion', data.version);
+    localStorage.setItem('mastersVersion2', data.version);
     await loadDropdowns();
   } catch (err) { console.warn('No se pudieron actualizar los maestros:', err); }
 }
