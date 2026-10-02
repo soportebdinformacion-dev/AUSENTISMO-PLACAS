@@ -2,143 +2,104 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Agrícola Huarmey - Ausentismo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#2E7D32">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="theme-color" content="#1F5C3A">
   <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
 </head>
 <body>
-
   <header>
-    <div class="brand-container">
-      <img src="ICONO HUARMEY.png" alt="Agrícola Huarmey Logo" class="header-logo">
-      <h2>Agrícola Huarmey | Plataforma Ausentismo Personal</h2>
-    </div>
+    <div class="brand"><img class="logo" src="logo.png" alt="Frusan" width="40" height="40"><div><h1>Agrícola Huarmey</h1><p>Registro de ausentismo</p></div></div>
+    <div id="status" class="pill online"><i></i><span id="status-text">Comprobando…</span></div>
   </header>
 
-  <div id="network-banner" class="online">Comprobando red...</div>
-
   <main>
-    <!-- VISTA 1: NUEVO REGISTRO -->
     <section id="view-nuevo" class="view active">
-      <div class="card">
-        <form id="ausentismo-form">
-          <div class="form-group">
-            <label for="placa">Placa *</label>
-            <select id="placa" required></select>
-          </div>
+      <form id="ausentismo-form" novalidate>
+        <fieldset>
+          <legend>Movilidad</legend>
+          <div class="field"><label for="placa">Placa</label><select id="placa" required></select></div>
+          <div class="field"><label for="ruta">Ruta</label><input id="ruta" readonly placeholder="Se completa con la placa"></div>
+        </fieldset>
 
-          <div class="form-group">
-            <label for="ruta">Ruta</label>
-            <input type="text" id="ruta" readonly placeholder="Se autocompleta con la placa">
-          </div>
+        <fieldset>
+          <legend>Trabajador</legend>
+          <div class="field"><label for="dni">DNI</label>
+            <input id="dni" maxlength="8" inputmode="numeric" autocomplete="off" placeholder="8 dígitos" required>
+            <p id="dni-alert" class="hint" aria-live="polite"></p></div>
+          <div class="field"><label for="nombre">Apellidos y nombres</label><input id="nombre" readonly placeholder="Aparece al escribir el DNI"></div>
+        </fieldset>
 
-          <div class="form-group">
-            <label for="dni">DNI Personal *</label>
-            <input type="text" id="dni" maxlength="8" pattern="[0-9]{8}" inputmode="numeric" placeholder="8 dígitos" required>
-            <div id="dni-alert" class="alert-inline"></div>
-          </div>
-
-          <div class="form-group">
-            <label for="nombre">Apellidos y Nombres</label>
-            <input type="text" id="nombre" readonly placeholder="Búsqueda por DNI">
-          </div>
-
-          <div class="form-group">
-            <label for="fechaFalta">Fecha de Falta *</label>
-            <input type="date" id="fechaFalta" required>
-          </div>
-
-          <div class="form-group">
-            <label for="motivo">Motivo de Ausencia *</label>
+        <fieldset>
+          <legend>Ausencia</legend>
+          <div class="field"><label for="fechaFalta">Fecha de falta</label><input type="date" id="fechaFalta" required></div>
+          <div class="field"><label for="motivo">Motivo</label>
             <select id="motivo" required>
-              <option value="">Seleccione...</option>
-              <option value="Ninguno">Ninguno</option>
-              <option value="Descanso médico (Absentismo)">Descanso médico (Absentismo)</option>
-              <option value="Permiso con papeleta (Absentismo)">Permiso con papeleta (Absentismo)</option>
-              <option value="Enfermedad">Enfermedad</option>
-              <option value="Problemas familiares">Problemas familiares</option>
-              <option value="Transporte">Transporte</option>
-              <option value="Otro trabajo">Otro trabajo</option>
-              <option value="Desmotivación">Desmotivación</option>
-              <option value="Sacar tarjeta">Sacar tarjeta</option>
-              <option value="Pago">Pago</option>
-              <option value="Horario">Horario</option>
-              <option value="Alimentación">Alimentación</option>
-              <option value="Campamento">Campamento</option>
-              <option value="Ambiente laboral">Ambiente laboral</option>
-              <option value="Renuncia">Renuncia</option>
-              <option value="Problemas con el caporal">Problemas con el caporal</option>
-              <option value="Estudios">Estudios</option>
-              <option value="Viaje">Viaje</option>
-              <option value="Accidente">Accidente</option>
-              <option value="No desea continuar">No desea continuar</option>
-            </select>
-          </div>
+              <option value="">Seleccione…</option>
+              <option>Ninguno</option><option>Descanso médico (Absentismo)</option><option>Permiso con papeleta (Absentismo)</option>
+              <option>Enfermedad</option><option>Problemas familiares</option><option>Transporte</option><option>Otro trabajo</option>
+              <option>Desmotivación</option><option>Sacar tarjeta</option><option>Pago</option><option>Horario</option>
+              <option>Alimentación</option><option>Campamento</option><option>Ambiente laboral</option><option>Renuncia</option>
+              <option>Problemas con el caporal</option><option>Estudios</option><option>Viaje</option><option>Accidente</option>
+              <option>No desea continuar</option>
+            </select></div>
+          <div class="field"><label for="observaciones">Observaciones <small id="obs-req"></small></label>
+            <textarea id="observaciones" rows="3" placeholder="Detalle lo que el trabajador indicó"></textarea></div>
+        </fieldset>
 
-          <div class="form-group" id="group-observaciones">
-            <label for="observaciones">Observaciones</label>
-            <textarea id="observaciones" rows="3" placeholder="Detalle observaciones adicionales..."></textarea>
-          </div>
+        <fieldset>
+          <legend>Retorno</legend>
+          <div class="field"><span class="label">¿Va a regresar?</span>
+            <div class="seg">
+              <label><input type="radio" name="vasARegresar" value="SI" checked><span>Sí</span></label>
+              <label><input type="radio" name="vasARegresar" value="NO"><span>No</span></label>
+              <label><input type="radio" name="vasARegresar" value="Lo está pensando"><span>Lo piensa</span></label>
+            </div></div>
+          <div class="field"><span class="label">Cuándo</span>
+            <div class="seg">
+              <label><input type="radio" name="tipoRetorno" value="Inmediato" checked><span>Inmediato</span></label>
+              <label><input type="radio" name="tipoRetorno" value="Específica"><span>Fecha específica</span></label>
+            </div></div>
+          <div class="field" id="group-fechaRetorno" hidden><label for="fechaRetorno">Fecha de retorno</label><input type="date" id="fechaRetorno"></div>
+        </fieldset>
 
-          <div class="form-group">
-            <label for="vasARegresar">¿Vas a regresar? *</label>
-            <select id="vasARegresar" required>
-              <option value="SI">SI</option>
-              <option value="NO">NO</option>
-              <option value="Lo está pensando">Lo está pensando</option>
-            </select>
-          </div>
-
-          <div class="form-group" id="group-retorno">
-            <label for="tipoRetorno">Retorno</label>
-            <select id="tipoRetorno">
-              <option value="Inmediato">Inmediato</option>
-              <option value="Específica">Fecha Específica</option>
-            </select>
-          </div>
-
-          <div class="form-group" id="group-fechaRetorno" style="display:none;">
-            <label for="fechaRetorno">Fecha de Retorno</label>
-            <input type="date" id="fechaRetorno">
-          </div>
-
-          <button type="submit" class="btn btn-primary">Guardar Registro</button>
-        </form>
-      </div>
+        <div class="savebar"><button type="submit" id="btn-save" class="btn">Guardar registro</button></div>
+      </form>
     </section>
 
-    <!-- VISTA 2: LISTA DE REGISTROS -->
     <section id="view-registros" class="view">
-      <div class="card">
-        <h3>Histórico / Pendientes</h3>
-        <br>
-        <div id="records-list"></div>
-      </div>
+      <h2 class="title">Registros guardados</h2>
+      <div id="records-list"></div>
     </section>
 
-    <!-- VISTA 3: CONFIG / SYNC -->
     <section id="view-config" class="view">
-      <div class="card">
-        <h3>Sincronización</h3>
-        <p style="margin: 12px 0; color: var(--text-secondary);">Forzar sincronización manual de la cola de registros con la hoja central de Google Sheets.</p>
-        <button id="btn-sync" class="btn btn-primary">Sincronizar Ahora</button>
+      <h2 class="title">Sincronización</h2>
+      <div class="stats">
+        <div><b id="n-pend">0</b><span>Pendientes</span></div>
+        <div><b id="n-err">0</b><span>Con error</span></div>
+        <div><b id="n-ok">0</b><span>Enviados</span></div>
       </div>
+      <p id="last-sync" class="muted"></p>
+      <button id="btn-sync" class="btn">Sincronizar ahora</button>
+      <button id="btn-retry" class="btn ghost" hidden>Reintentar los que dieron error</button>
     </section>
   </main>
 
+  <div id="toast" role="status" aria-live="polite"></div>
+
   <nav>
-    <button class="nav-btn active" data-view="view-nuevo">📝 Registro</button>
-    <button class="nav-btn" data-view="view-registros">📁 Guardados</button>
-    <button class="nav-btn" data-view="view-config">🔄 Sincronizar</button>
+    <button class="nav-btn active" data-view="view-nuevo"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg>Registro</button>
+    <button class="nav-btn" data-view="view-registros"><svg viewBox="0 0 24 24"><path d="M5 5h14M5 12h14M5 19h14"/></svg>Guardados<em id="nav-badge" hidden></em></button>
+    <button class="nav-btn" data-view="view-config"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14-4M4 4v4h4M4 13a8 8 0 0 0 14 4M20 20v-4h-4"/></svg>Sincronizar</button>
   </nav>
 
-  <script src="db.js"></script>
-  <script src="app.js"></script>
-</body>
-</html>
   <script src="db.js"></script>
   <script src="app.js"></script>
 </body>
