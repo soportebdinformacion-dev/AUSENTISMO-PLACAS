@@ -5,6 +5,11 @@ db.version(1).stores({
   ausentismos: 'id, estado, fechaRegistro'
 });
 
+const normDni = d => {
+  const s = String(d == null ? '' : d).replace(/\D/g, '');
+  return s && s.length < 8 ? s.padStart(8, '0') : s;
+};
+
 const DB = {
   async setMaestros(data) {
     const rows = (data || []).filter(r => r.placa);
@@ -12,13 +17,13 @@ const DB = {
     await db.transaction('rw', db.maestros, async () => { await db.maestros.clear(); await db.maestros.bulkPut(rows); });
   },
   async setPersonal(data) {
-    const rows = (data || []).filter(r => r.dni);
+    const rows = (data || []).map(r => ({ dni: normDni(r.dni), nombre: r.nombre })).filter(r => r.dni);
     if (!rows.length) return;
     await db.transaction('rw', db.personal, async () => { await db.personal.clear(); await db.personal.bulkPut(rows); });
   },
   async getRutaByPlaca(placa) { const r = await db.maestros.get(placa); return r ? r.ruta : ''; },
   async getAllPlacas() { return (await db.maestros.orderBy('placa').keys()); },
-  async getPersonalByDNI(dni) { return db.personal.get(dni); },
+  async getPersonalByDNI(dni) { return db.personal.get(normDni(dni)); },
   async countPersonal() { return db.personal.count(); },
 
   async saveAusentismo(record) { return db.ausentismos.put(record); },
