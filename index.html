@@ -16,7 +16,7 @@
 </head>
 <body>
   <header>
-    <div class="brand"><img class="logo" src="logo.png" alt="Frusan" width="40" height="40"><div><h1>Agrícola Huarmey</h1><p>Registro de ausentismo</p></div></div>
+    <div class="brand"><img class="logo" src="logo.png" alt="Frusan" width="54" height="54"><div><h1>Agrícola Huarmey</h1><p>Registro de ausentismo</p></div></div>
     <div id="status" class="pill online"><i></i><span id="status-text">Comprobando…</span></div>
   </header>
 
@@ -62,12 +62,14 @@
               <label><input type="radio" name="vasARegresar" value="NO"><span>No</span></label>
               <label><input type="radio" name="vasARegresar" value="Lo está pensando"><span>Lo piensa</span></label>
             </div></div>
-          <div class="field"><span class="label">Cuándo</span>
-            <div class="seg">
-              <label><input type="radio" name="tipoRetorno" value="Inmediato" checked><span>Inmediato</span></label>
-              <label><input type="radio" name="tipoRetorno" value="Específica"><span>Fecha específica</span></label>
-            </div></div>
-          <div class="field" id="group-fechaRetorno" hidden><label for="fechaRetorno">Fecha de retorno</label><input type="date" id="fechaRetorno"></div>
+          <div id="group-retorno">
+            <div class="field"><span class="label">Retorno</span>
+              <div class="seg">
+                <label><input type="radio" name="tipoRetorno" value="Inmediato" checked><span>Inmediato</span></label>
+                <label><input type="radio" name="tipoRetorno" value="Específica"><span>Fecha</span></label>
+              </div></div>
+            <div class="field" id="group-fechaRetorno" hidden><label for="fechaRetorno">Fecha de retorno</label><input type="date" id="fechaRetorno"></div>
+          </div>
         </fieldset>
 
         <div class="savebar"><button type="submit" id="btn-save" class="btn">Guardar registro</button></div>
