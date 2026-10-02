@@ -1,57 +1,28 @@
-const CACHE_NAME = 'huarmey-pwa-v1';
-const STATIC_ASSETS = [
-  './',
-  './index.html',
-  './styles.css',
-  './app.js',
-  './db.js',
-  './manifest.json',
-  'https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js'
-];
+const CACHE_NAME = 'huarmey-pwa-v3';
+const STATIC_ASSETS = ['./', './index.html', './styles.css', './app.js', './db.js', './manifest.json', './logo.png', './icon-192.png', './icon-512.png', './favicon.png',
+  'https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js'];
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(STATIC_ASSETS)));
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) return caches.delete(key);
-        })
-      )
-    )
-  );
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))));
   self.clients.claim();
 });
 
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-
-  // Network First para la API de Google Apps Script
-  if (url.hostname.includes('script.google.com')) {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
-    );
-    return;
-  }
-
-  // Stale-While-Revalidate para recursos estáticos
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        if (networkResponse.status === 200) {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
-        }
-        return networkResponse;
-      }).catch(() => cachedResponse);
-
-      return cachedResponse || fetchPromise;
+self.addEventListener('fetch', e => {
+  const req = e.request;
+  const url = new URL(req.url);
+  if (req.method !== 'GET' || url.hostname.includes('script.google.com') || url.hostname.includes('googleusercontent.com')) return; // la API va directo a la red
+  e.respondWith(
+    caches.match(req).then(cached => {
+      const net = fetch(req).then(res => {
+        if (res.ok || res.type === 'opaque') { const copy = res.clone(); caches.open(CACHE_NAME).then(c => c.put(req, copy)); }
+        return res;
+      }).catch(() => cached);
+      return cached || net;
     })
   );
 });
