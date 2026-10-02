@@ -1,4 +1,4 @@
-const CACHE_NAME = 'huarmey-pwa-v3';
+const CACHE_NAME = 'huarmey-pwa-v5';
 const STATIC_ASSETS = ['./', './index.html', './styles.css', './app.js', './db.js', './manifest.json', './logo.png', './icon-192.png', './icon-512.png', './favicon.png',
   'https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js'];
 
