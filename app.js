@@ -1,4 +1,4 @@
-const GAS_ENDPOINT = 'https://script.google.com/macros/s/TU_SCRIPT_ID_AQUI/exec';
+const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzM8gHHnQV7UYn0CQH1daeNXnd2CqQ6pdtFQJMLsGDwLIuQkiD5Lvo-Xas3A41C1tEvcA/exec';
 const BATCH_SIZE = 25;          // registros por envío
 const SYNC_EVERY_MS = 60000;    // revisión periódica (solo envía si hay pendientes)
 const MOTIVOS_CON_DETALLE = ['Transporte', 'Otro trabajo', 'Renuncia', 'Problemas con el caporal', 'No desea continuar'];
