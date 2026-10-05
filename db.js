@@ -24,6 +24,7 @@ const DB = {
   async getRutaByPlaca(placa) { const r = await db.maestros.get(placa); return r ? r.ruta : ''; },
   async getAllPlacas() { return (await db.maestros.orderBy('placa').keys()); },
   async getPersonalByDNI(dni) { return db.personal.get(normDni(dni)); },
+  async getAllPersonal() { return db.personal.toArray(); },
   async countPersonal() { return db.personal.count(); },
 
   async saveAusentismo(record) { return db.ausentismos.put(record); },
