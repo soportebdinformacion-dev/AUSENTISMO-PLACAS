@@ -1,4 +1,4 @@
-const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxljrzCBfDowuVUwNf5agxItlnwbCNUUzi-2a9YheGU9cIIGOY2WjWWKoHTSgcVgWbKDg/exec';
+const GAS_ENDPOINT = 'https://script.google.com/macros/s/TU_SCRIPT_ID_AQUI/exec';
 const BATCH_SIZE = 25;          // registros por envío
 const SYNC_EVERY_MS = 60000;    // revisión periódica (solo envía si hay pendientes)
 const MOTIVOS_CON_DETALLE = ['Transporte', 'Otro trabajo', 'Renuncia', 'Problemas con el caporal', 'No desea continuar'];
@@ -18,6 +18,7 @@ async function initApp() {
   setupEvents();
   setStatus(navigator.onLine ? 'online' : 'offline');
   await loadDropdowns();
+  await loadPersonal();
   await refreshAll();
   // Escalonar para que 160 equipos no pidan todos a la vez
   const firstRun = (await DB.countPersonal()) === 0;
@@ -50,14 +51,11 @@ function setupEvents() {
 
   $('placa').addEventListener('change', async e => { $('ruta').value = await DB.getRutaByPlaca(e.target.value); });
 
-  $('dni').addEventListener('input', async e => {
-    const dni = e.target.value = e.target.value.replace(/\D/g, '');
-    const hint = $('dni-alert');
-    $('nombre').value = ''; hint.textContent = ''; hint.className = 'hint';
-    if (dni.length !== 8) return;
-    const p = await DB.getPersonalByDNI(dni);
-    if (p) { $('nombre').value = p.nombre; hint.textContent = 'Trabajador encontrado'; hint.className = 'hint good'; }
-    else { hint.textContent = 'DNI no encontrado en el padrón local'; hint.className = 'hint bad'; }
+  $('buscar').addEventListener('input', onBuscar);
+  $('buscar').addEventListener('keydown', e => { if (e.key === 'Escape') showResults([]); });
+  $('resultados').addEventListener('click', e => {
+    const b = e.target.closest('button[data-i]');
+    if (b) elegir(lastResults[+b.dataset.i]);
   });
 
   $('motivo').addEventListener('change', e => {
@@ -82,6 +80,54 @@ function setupEvents() {
 
 const getRadio = name => document.querySelector(`input[name=${name}]:checked`).value;
 
+// ===== Búsqueda de trabajador por DNI o por apellidos y nombres =====
+let personalIdx = [], lastResults = [];
+const norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+async function loadPersonal() {
+  personalIdx = (await DB.getAllPersonal()).map(p => ({ dni: p.dni, nombre: p.nombre, words: norm(p.nombre).split(' ') }));
+}
+
+// Sin importar mayúsculas, tildes ni orden; cada palabra escrita puede ser el inicio de una del nombre
+function buscarPersonal(q) {
+  const raw = q.trim();
+  if (/^\d+$/.test(raw)) return raw.length < 3 ? [] : personalIdx.filter(p => p.dni.includes(raw)).slice(0, 8);
+  if (raw.length < 2) return [];
+  const toks = norm(raw).split(' ').filter(Boolean);
+  return personalIdx.filter(p => toks.every(t => p.words.some(w => w.startsWith(t)))).slice(0, 8);
+}
+
+function showResults(list, emptyMsg) {
+  lastResults = list;
+  const ul = $('resultados');
+  ul.hidden = !list.length && !emptyMsg;
+  ul.innerHTML = list.length
+    ? list.map((p, i) => `<li><button type="button" data-i="${i}"><b>${esc(p.nombre)}</b><span>${esc(p.dni)}</span></button></li>`).join('')
+    : `<li class="none">${esc(emptyMsg || '')}</li>`;
+}
+
+function elegir(p) {
+  if (!p) return;
+  $('dni').value = p.dni; $('nombre').value = p.nombre; $('buscar').value = p.nombre;
+  $('buscar').classList.remove('invalid');
+  showResults([]);
+  const hint = $('dni-alert'); hint.textContent = 'Trabajador seleccionado'; hint.className = 'hint good';
+}
+
+function onBuscar(e) {
+  const raw = e.target.value.trim(), hint = $('dni-alert');
+  $('dni').value = ''; $('nombre').value = ''; hint.textContent = ''; hint.className = 'hint';
+  const res = buscarPersonal(raw);
+  if (/^\d{8}$/.test(raw)) {
+    const exact = res.find(p => p.dni === raw);
+    if (exact) return elegir(exact);
+    $('dni').value = raw; showResults([]);
+    hint.textContent = 'DNI no encontrado en el padrón local'; hint.className = 'hint bad';
+    return;
+  }
+  showResults(res, raw.length >= 2 && !res.length ? 'Sin coincidencias' : '');
+}
+
 async function loadDropdowns() {
   const placas = await DB.getAllPlacas();
   const sel = $('placa'), cur = sel.value;
@@ -94,7 +140,7 @@ function validate() {
   const bad = [];
   const check = (id, ok) => { $(id).classList.toggle('invalid', !ok); if (!ok) bad.push(id); };
   check('placa', !!$('placa').value);
-  check('dni', /^\d{8}$/.test($('dni').value));
+  check('buscar', /^\d{8}$/.test($('dni').value));
   check('fechaFalta', !!$('fechaFalta').value);
   check('motivo', !!$('motivo').value);
   check('observaciones', !$('observaciones').required || !!$('observaciones').value.trim());
@@ -118,7 +164,7 @@ async function handleFormSubmit(e) {
   };
   await DB.saveAusentismo(record);
   e.target.reset();
-  $('nombre').value = ''; $('ruta').value = ''; $('dni-alert').textContent = ''; $('group-retorno').hidden = false; $('group-fechaRetorno').hidden = true;
+  $('nombre').value = ''; $('ruta').value = ''; $('dni-alert').textContent = ''; showResults([]); $('group-retorno').hidden = false; $('group-fechaRetorno').hidden = true;
   $('obs-req').textContent = ''; $('observaciones').required = false;
   await loadDropdowns();
   await refreshAll();
@@ -181,6 +227,7 @@ async function syncMasterData() {
     if (data.status !== 'OK' || data.unchanged) return;
     await DB.setMaestros(data.maestros);
     await DB.setPersonal(data.personal);
+    await loadPersonal();
     localStorage.setItem('mastersVersion2', data.version);
     await loadDropdowns();
   } catch (err) { console.warn('No se pudieron actualizar los maestros:', err); }
