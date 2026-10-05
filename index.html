@@ -31,10 +31,12 @@
 
         <fieldset>
           <legend>Trabajador</legend>
-          <div class="field"><label for="dni">DNI</label>
-            <input id="dni" maxlength="8" inputmode="numeric" autocomplete="off" placeholder="8 dígitos" required>
+          <div class="field"><label for="buscar">Buscar por DNI o nombre</label>
+            <input id="buscar" type="search" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="DNI o apellidos y nombres">
+            <ul id="resultados" class="results" hidden></ul>
             <p id="dni-alert" class="hint" aria-live="polite"></p></div>
-          <div class="field"><label for="nombre">Apellidos y nombres</label><input id="nombre" readonly placeholder="Aparece al escribir el DNI"></div>
+          <div class="field"><label for="dni">DNI</label><input id="dni" readonly placeholder="Se completa al elegir"></div>
+          <div class="field"><label for="nombre">Apellidos y nombres</label><input id="nombre" readonly placeholder="Se completa al elegir"></div>
         </fieldset>
 
         <fieldset>
