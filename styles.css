@@ -19,6 +19,13 @@ label,.label{display:block;font-weight:700;font-size:.92rem;margin-bottom:6px}
 small{font-weight:400;color:var(--muted)}small.req{color:var(--err);font-weight:700}
 input,select,textarea{width:100%;min-height:52px;padding:12px 14px;font:inherit;color:var(--ink);background:#fff;border:2px solid var(--line);border-radius:10px}
 input:focus,select:focus,textarea:focus,.btn:focus-visible,.nav-btn:focus-visible{outline:3px solid var(--harvest);outline-offset:1px;border-color:var(--leaf)}
+input[type=search]{-webkit-appearance:none;appearance:none}
+.results{list-style:none;margin-top:6px;border:2px solid var(--leaf);border-radius:10px;overflow:hidden;max-height:340px;overflow-y:auto;background:#fff}
+.results li+li{border-top:1px solid var(--line)}
+.results button{width:100%;min-height:56px;padding:8px 14px;border:0;background:#fff;font:inherit;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer}
+.results button:active,.results button:focus-visible{background:#E3EFE3}
+.results b{font-size:.98rem}.results span{color:var(--muted);font-size:.9rem;white-space:nowrap}
+.results .none{padding:14px;color:var(--muted)}
 input[readonly]{background:#EAEFE6;color:var(--muted)}
 .invalid{border-color:var(--err)}
 .hint{min-height:1.2em;margin-top:5px;font-size:.88rem;font-weight:700}.hint.bad{color:var(--err)}.hint.good{color:var(--ok)}
